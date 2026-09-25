@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <!--
+    ProcessLogger.Cli hosts an ETW kernel-process trace session and a WMI process trace, both of
+    which require administrator rights. Marking the whole exe requireAdministrator lets Windows'
+    own UAC prompt handle elevation (and failure if declined) instead of hand-rolled relaunch code.
+  -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>

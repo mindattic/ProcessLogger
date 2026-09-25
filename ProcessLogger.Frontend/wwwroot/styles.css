@@ -1,0 +1,395 @@
+/* Design tokens. WCAG 2.2 AA needs 4.5:1 for body text and 3:1 for non-text UI boundaries;
+   every value below was checked against the surface it is actually drawn on (relative-luminance
+   contrast formula), not picked by eye.
+
+   Dark is the default in :root - matches this app family's convention (see Automata.App's
+   tokens.css) of "dark is the theme nobody has chosen yet". Light is a full override, recomputed
+   against its own surfaces rather than inverted from the dark set. */
+:root {
+  --bg: #1e1e1e;             /* fg #f0f0f0 -> 14.6:1 */
+  --fg: #f0f0f0;
+  --control-bg: #252525;
+  --panel-bg: #2a2a2a;
+  --border: #9a9a9a;          /* 5.9:1 on --bg */
+  --accent: #6fb1ff;          /* 7.5:1 on --bg */
+  --accent-fg: #1e1e1e;       /* 7.5:1 on --accent */
+  --error: #ff8a80;           /* 7.3:1 on --bg */
+  --grid-header-bg: #2a2a2a;
+  --grid-alt-bg: #262626;
+  --scrollbar-thumb: #6a6a6a;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --font-ui: "Segoe UI", sans-serif;
+  --radius: 3px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #ffffff;
+    --fg: #1a1a1a;             /* 17.9:1 on --bg */
+    --control-bg: #ffffff;
+    --panel-bg: #f3f3f3;
+    --border: #767676;         /* 4.5:1 on --bg */
+    --accent: #005fcc;         /* 6.0:1 on --bg */
+    --accent-fg: #ffffff;
+    --error: #b3261e;          /* 6.5:1 on --bg */
+    --grid-header-bg: #e6e6e6;
+    --grid-alt-bg: #f5f5f5;
+    --scrollbar-thumb: #b0b0b0;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --control-bg: #ffffff;
+  --panel-bg: #f3f3f3;
+  --border: #767676;
+  --accent: #005fcc;
+  --accent-fg: #ffffff;
+  --error: #b3261e;
+  --grid-header-bg: #e6e6e6;
+  --grid-alt-bg: #f5f5f5;
+  --scrollbar-thumb: #b0b0b0;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-3);
+  gap: var(--space-2);
+}
+
+input, select, button {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--fg);
+  background: var(--control-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px 6px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+input:focus-visible, select:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---- topbar / settings ---- */
+
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.icon-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--radius);
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
+
+.icon-btn:hover {
+  border-color: var(--border);
+  background: var(--panel-bg);
+}
+
+.value-label {
+  min-width: 3.5em;
+  color: var(--fg);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-width: 340px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.modal-body {
+  padding: var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.modal-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.modal-row-label {
+  min-width: 9.5em;
+}
+
+input[type="range"] {
+  width: 220px;
+  accent-color: var(--accent);
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+/* ---- tabs ---- */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--bg);
+  padding: 6px 14px;
+}
+
+.tab.active {
+  background: var(--panel-bg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.tab-panel {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tab-panel.active {
+  display: flex;
+}
+
+/* ---- filter bar ---- */
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.filter-error {
+  color: var(--error);
+}
+
+/* ---- grid ---- */
+
+.grid-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+table.data-grid {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.data-grid thead th {
+  position: sticky;
+  top: 0;
+  background: var(--grid-header-bg);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 0;
+  text-align: left;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.data-grid th .th-inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.data-grid th .th-label {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.col-resize-handle:hover, .col-resize-handle.resizing {
+  background: var(--accent);
+}
+
+.data-grid th .sort-glyph {
+  font-size: 10px;
+  opacity: 0.7;
+  width: 0.8em;
+}
+
+.filter-btn {
+  border: 1px solid var(--border);
+  background: var(--control-bg);
+  border-radius: var(--radius);
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  font-size: 9px;
+  padding: 0;
+  flex: none;
+}
+
+.filter-btn.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+
+.data-grid td {
+  padding: 3px 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 0; /* with table-layout:fixed, forces the col width to be authoritative so ellipsis kicks in */
+}
+
+.data-grid tbody tr:nth-child(even) {
+  background: var(--grid-alt-bg);
+}
+
+.data-grid tbody tr:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg));
+}
+
+/* ---- column filter popover ---- */
+
+.col-filter-popover {
+  position: fixed;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  min-width: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.col-filter-popover input[type="text"] {
+  width: 100%;
+  margin-bottom: var(--space-2);
+}
+
+.col-filter-popover .popover-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.col-filter-popover .value-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.col-filter-popover label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+/* ---- scrollbars (WebView2 is Chromium, so these are fully respected) ---- */
+
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--panel-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 7px;
+  border: 3px solid var(--panel-bg);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--panel-bg);
+}

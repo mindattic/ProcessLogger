@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="ProcessLogger.Core/ProcessLogger.Core.csproj" />
+  <Project Path="ProcessLogger.Cli/ProcessLogger.Cli.csproj" />
+  <Project Path="ProcessLogger.Frontend/ProcessLogger.Frontend.csproj" />
+  <Project Path="ProcessLogger.Tests/ProcessLogger.Tests.csproj" />
+</Solution>

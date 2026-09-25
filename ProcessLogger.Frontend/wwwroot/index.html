@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProcessLogger</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="topbar">
+  <button type="button" id="settings-btn" class="icon-btn" title="Settings" aria-haspopup="dialog">&#9881;</button>
+</div>
+
+<div id="settings-modal" class="modal-overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="modal-header">
+      <h2 id="settings-title">Settings</h2>
+      <button type="button" id="settings-close" class="icon-btn" title="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="modal-row">
+        <span class="modal-row-label">Auto-refresh every:</span>
+        <input type="range" id="refresh-interval" min="1" max="1200" value="3">
+        <span id="refresh-interval-label" class="value-label">3s</span>
+      </label>
+      <label class="modal-row">
+        <span class="modal-row-label">Theme:</span>
+        <select id="theme-select">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab active" data-tab="process" role="tab" aria-selected="true">Processes</button>
+  <button class="tab" data-tab="focus" role="tab" aria-selected="false">Focus</button>
+</div>
+
+<section id="tab-process" class="tab-panel active">
+  <div class="filter-bar">
+    <label>Include: <input type="text" id="process-include"></label>
+    <label>Exclude: <input type="text" id="process-exclude"></label>
+    <label>Match:
+      <select id="process-match-mode">
+        <option value="PartialText">Partial text</option>
+        <option value="ExactString">Exact string</option>
+        <option value="Regex">Regex</option>
+      </select>
+    </label>
+    <label>Last:
+      <select id="process-take">
+        <option>50</option><option selected>100</option><option>200</option><option>500</option><option>1000</option>
+      </select>
+    </label>
+    <button id="process-refresh">Refresh</button>
+    <button id="process-reset-sort" title="Sort by newest first">Reset sort</button>
+    <span class="filter-error" id="process-error"></span>
+  </div>
+  <div class="grid-wrap">
+    <table class="data-grid" id="process-table">
+      <colgroup>
+        <col data-col="Name" style="width:140px">
+        <col data-col="Title" style="width:160px">
+        <col data-col="ProcessId" style="width:60px">
+        <col data-col="ParentProcessName" style="width:120px">
+        <col data-col="Path" style="width:220px">
+        <col data-col="OpenedUtc" style="width:150px">
+        <col data-col="ClosedUtc" style="width:150px">
+        <col data-col="DurationMs" style="width:100px">
+        <col data-col="PeakWorkingSetBytes" style="width:100px">
+        <col data-col="FinalWorkingSetBytes" style="width:100px">
+        <col data-col="SampleCount" style="width:70px">
+        <col data-col="Source" style="width:70px">
+      </colgroup>
+      <thead><tr>
+        <th data-col="Name">Name</th>
+        <th data-col="Title">Title</th>
+        <th data-col="ProcessId">PID</th>
+        <th data-col="ParentProcessName">Parent</th>
+        <th data-col="Path">Path</th>
+        <th data-col="OpenedUtc">Opened (UTC)</th>
+        <th data-col="ClosedUtc">Closed (UTC)</th>
+        <th data-col="DurationMs">Duration (ms)</th>
+        <th data-col="PeakWorkingSetBytes">Peak WS (KB)</th>
+        <th data-col="FinalWorkingSetBytes">Final WS (KB)</th>
+        <th data-col="SampleCount">Samples</th>
+        <th data-col="Source">Source</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="tab-focus" class="tab-panel">
+  <div class="filter-bar">
+    <label>Include: <input type="text" id="focus-include"></label>
+    <label>Exclude: <input type="text" id="focus-exclude"></label>
+    <label>Match:
+      <select id="focus-match-mode">
+        <option value="PartialText">Partial text</option>
+        <option value="ExactString">Exact string</option>
+        <option value="Regex">Regex</option>
+      </select>
+    </label>
+    <label>Last:
+      <select id="focus-take">
+        <option>50</option><option selected>100</option><option>200</option><option>500</option>
+      </select>
+    </label>
+    <button id="focus-refresh">Refresh</button>
+    <button id="focus-reset-sort" title="Sort by newest first">Reset sort</button>
+    <span class="filter-error" id="focus-error"></span>
+  </div>
+  <div class="grid-wrap">
+    <table class="data-grid" id="focus-table">
+      <colgroup>
+        <col data-col="ProcessName" style="width:140px">
+        <col data-col="ProcessId" style="width:60px">
+        <col data-col="WindowTitle" style="width:280px">
+        <col data-col="FocusedAtUtc" style="width:150px">
+        <col data-col="FocusLostAtUtc" style="width:150px">
+      </colgroup>
+      <thead><tr>
+        <th data-col="ProcessName">Process</th>
+        <th data-col="ProcessId">PID</th>
+        <th data-col="WindowTitle">Window title</th>
+        <th data-col="FocusedAtUtc">Focused (UTC)</th>
+        <th data-col="FocusLostAtUtc">Lost (UTC)</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>
