@@ -232,6 +232,10 @@ input[type="range"] {
   color: var(--error);
 }
 
+.status-msg {
+  color: var(--accent);
+}
+
 /* ---- grid ---- */
 
 .grid-wrap {

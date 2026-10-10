@@ -158,6 +158,39 @@
     el.textContent = message || '';
   }
 
+  function setExportStatus(entity, message) {
+    var el = $(entity + '-export-status');
+    if (el) el.textContent = message || '';
+  }
+
+  // ---- CSV export --------------------------------------------------------------------------
+
+  function csvCell(value) {
+    var s = String(value);
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function buildCsv(entity) {
+    var columns = Object.keys(ENTITIES[entity].columns);
+    var lines = [columns.map(csvCell).join(',')];
+    visibleRows(entity).forEach(function (row) {
+      lines.push(columns.map(function (col) {
+        return csvCell(ENTITIES[entity].columns[col].fmt(row[rowKey(col)]));
+      }).join(','));
+    });
+    return lines.join('\r\n');
+  }
+
+  function exportCsv(entity) {
+    var stamp = new Date().toISOString().slice(0, 10);
+    setExportStatus(entity, '');
+    post('exportCsv', {
+      entity: entity,
+      csv: buildCsv(entity),
+      suggestedName: 'processlogger-' + entity + '-' + stamp + '.csv',
+    });
+  }
+
   window.processLogger = {
     onProcessRows: function (rows) { state.process.rows = rows; renderTable('process'); },
     onFocusRows: function (rows) { state.focus.rows = rows; renderTable('focus'); },
@@ -174,26 +207,35 @@
       cf.loaded = true;
       refreshOpenPopover(payload.entity, payload.column);
     },
+    onExportSaved: function (payload) {
+      setExportStatus(payload.entity, 'Exported to ' + payload.fileName + '.');
+    },
     onError: function (payload) {
-      var entity = payload.action === 'queryFocus' ? 'focus' : 'process';
-      setError(entity, 'Invalid filter: ' + payload.message);
+      var entity = payload.entity || (payload.action === 'queryFocus' ? 'focus' : 'process');
+      if (payload.action === 'exportCsv') setExportStatus(entity, 'Export failed: ' + payload.message);
+      else setError(entity, 'Invalid filter: ' + payload.message);
     },
   };
 
   // ---- rendering -----------------------------------------------------------------------------
 
-  function renderTable(entity) {
-    var tbody = document.querySelector('#' + entity + '-table tbody');
+  // Same filter + sort state renderTable() shows, shared with CSV export so "export" always
+  // means "export what you're looking at right now".
+  function visibleRows(entity) {
     var rows = state[entity].rows.filter(function (r) { return rowPasses(entity, r); });
 
-    var sortCol = state[entity].sortCol;
+    var sortKey = rowKey(state[entity].sortCol);
     var sortDesc = state[entity].sortDesc;
-    var sortKey = rowKey(sortCol);
-    rows = rows.slice().sort(function (a, b) {
+    return rows.slice().sort(function (a, b) {
       var av = a[sortKey], bv = b[sortKey];
       var cmp = av === bv ? 0 : (av === null || av === undefined) ? -1 : (bv === null || bv === undefined) ? 1 : (av < bv ? -1 : 1);
       return sortDesc ? -cmp : cmp;
     });
+  }
+
+  function renderTable(entity) {
+    var tbody = document.querySelector('#' + entity + '-table tbody');
+    var rows = visibleRows(entity);
 
     var columns = Object.keys(ENTITIES[entity].columns);
     tbody.innerHTML = rows.map(function (row) {
@@ -461,6 +503,7 @@
       state[entity].sortDesc = ENTITIES[entity].defaultSort.desc;
       renderTable(entity);
     });
+    $(entity + '-export-csv').addEventListener('click', function () { exportCsv(entity); });
   }
 
   function wireTabs() {

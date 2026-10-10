@@ -5,6 +5,8 @@ using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Input;
 using Microsoft.Web.WebView2.Core;
+using Microsoft.Win32;
+using MindAttic.Export.Artifacts;
 using ProcessLogger.Core.Query;
 
 namespace ProcessLogger.Frontend;
@@ -85,6 +87,9 @@ public partial class MainWindow : Window
                     break;
                 case "getColumnValues":
                     await HandleGetColumnValuesAsync(msg);
+                    break;
+                case "exportCsv":
+                    await HandleExportCsvAsync(msg);
                     break;
                 case "jsError":
                     LogDebug($"JS error: {msg["message"]?.GetValue<string>()} ({msg["source"]?.GetValue<string>()})");
@@ -181,15 +186,44 @@ public partial class MainWindow : Window
         _ => [],
     };
 
+    // A Save-dialog path is exact and the dialog already confirmed any overwrite.
+    private static readonly ArtifactOptions ChosenFile = new() { Existing = ExistingArtifact.Overwrite, SanitizeName = false };
+
+    private async Task HandleExportCsvAsync(JsonNode msg)
+    {
+        var entity = msg["entity"]?.GetValue<string>() ?? "process";
+        var csv = msg["csv"]?.GetValue<string>() ?? "";
+        var suggestedName = msg["suggestedName"]?.GetValue<string>() ?? "processlogger-export.csv";
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export to CSV",
+            FileName = suggestedName,
+            Filter = "CSV (*.csv)|*.csv",
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        try
+        {
+            await ArtifactWriter.WriteTextAsync(
+                Path.GetDirectoryName(dialog.FileName)!, Path.GetFileName(dialog.FileName), csv, ChosenFile);
+            await PostAsync("onExportSaved", new { entity, fileName = Path.GetFileName(dialog.FileName) });
+        }
+        catch (IOException ex)
+        {
+            await PostErrorAsync("exportCsv", ex.Message, entity);
+        }
+    }
+
     private async Task PostAsync(string jsFunction, object payload)
     {
         var json = JsonSerializer.Serialize(payload, JsonOptions);
         await TryExecuteScriptAsync($"window.processLogger.{jsFunction}({json})");
     }
 
-    private async Task PostErrorAsync(string action, string message)
+    private async Task PostErrorAsync(string action, string message, string? entity = null)
     {
-        var json = JsonSerializer.Serialize(new { action, message }, JsonOptions);
+        var json = JsonSerializer.Serialize(new { action, message, entity }, JsonOptions);
         await TryExecuteScriptAsync($"window.processLogger.onError({json})");
     }
 
