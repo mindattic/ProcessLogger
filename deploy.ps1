@@ -1,0 +1,180 @@
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+    Builds and deploys ProcessLogger to C:\Apps\ProcessLogger\ (Cli\ and Frontend\),
+    and optionally starts both. The one script for publishing and launching ProcessLogger.
+
+.DESCRIPTION
+    Publishes two components in Release:
+      Cli\ProcessLogger.Cli.exe            the background logger (requireAdministrator)
+      Frontend\ProcessLogger.Frontend.exe  the WPF viewer
+    and writes C:\Apps\ProcessLogger\deploy.bat, which the desktop shortcut points at.
+    deploy.bat runs this script (a fast no-op when nothing changed), then starts the
+    logger (UAC prompt) and the viewer.
+
+    Without -Force a component is republished only when its exe or deploy.bat is
+    missing, or a source file under its project or ProcessLogger.Core (or
+    Directory.Build.props) is newer than its deployed exe.
+
+    Before publishing a component, running copies are closed. The logger runs
+    elevated, so from a non-elevated shell it usually can't be stopped; in that case
+    its republish is skipped (with a message) rather than failing.
+
+.PARAMETER Force
+    Clean bin/obj and republish both components even if nothing looks changed.
+
+.PARAMETER Launch
+    After deploying, start the logger (elevated) and the viewer.
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File deploy.ps1 -Force
+#>
+param(
+    [switch]$Force,
+    [switch]$Launch
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$repo       = $PSScriptRoot
+$deployDir  = 'C:\Apps\ProcessLogger'
+$deployBat  = Join-Path $deployDir 'deploy.bat'
+$props      = Join-Path $repo 'Directory.Build.props'
+$coreDir    = Join-Path $repo 'ProcessLogger.Core'
+$sourceExts = @('.cs', '.csproj', '.xaml', '.json', '.props', '.targets', '.resx',
+                '.manifest', '.html', '.js', '.css')
+
+$components = @(
+    [pscustomobject]@{
+        Name     = 'ProcessLogger.Cli'
+        ProjDir  = Join-Path $repo 'ProcessLogger.Cli'
+        OutDir   = Join-Path $deployDir 'Cli'
+        Graceful = $false   # console app, usually elevated
+    },
+    [pscustomobject]@{
+        Name     = 'ProcessLogger.Frontend'
+        ProjDir  = Join-Path $repo 'ProcessLogger.Frontend'
+        OutDir   = Join-Path $deployDir 'Frontend'
+        Graceful = $true    # WPF window: CloseMainWindow
+    }
+)
+
+function Get-Exe($c) { Join-Path $c.OutDir ($c.Name + '.exe') }
+
+function Test-NeedsPublish($c) {
+    $exe = Get-Exe $c
+    if (-not (Test-Path $exe)) { return $true }
+    if (-not (Test-Path $deployBat)) { return $true }
+    $exeTime = (Get-Item $exe).LastWriteTimeUtc
+    if ((Test-Path $props) -and (Get-Item $props).LastWriteTimeUtc -gt $exeTime) { return $true }
+
+    foreach ($dir in @($c.ProjDir, $coreDir)) {
+        $newer = Get-ChildItem -Path $dir -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.FullName -notmatch '\\(bin|obj)\\' -and
+                ($sourceExts -contains $_.Extension.ToLowerInvariant()) -and
+                $_.LastWriteTimeUtc -gt $exeTime
+            } |
+            Select-Object -First 1
+        if ($newer) { return $true }
+    }
+    return $false
+}
+
+# Returns $true when no instance is left running.
+function Stop-Component($c) {
+    $procs = @(Get-Process -Name $c.Name -ErrorAction SilentlyContinue)
+    if ($procs.Count -eq 0) { return $true }
+
+    Write-Host "Closing running $($c.Name) ($($procs.Count))..." -ForegroundColor Yellow
+    foreach ($p in $procs) {
+        try { if ($p.MainWindowHandle -ne [IntPtr]::Zero) { [void]$p.CloseMainWindow() } } catch { }
+    }
+    foreach ($p in $procs) {
+        try { [void]$p.WaitForExit(5000) } catch { }
+    }
+    foreach ($p in @(Get-Process -Name $c.Name -ErrorAction SilentlyContinue)) {
+        try { Stop-Process -Id $p.Id -Force -ErrorAction Stop; [void]$p.WaitForExit(3000) } catch { }
+    }
+    return (@(Get-Process -Name $c.Name -ErrorAction SilentlyContinue).Count -eq 0)
+}
+
+function Publish($c) {
+    if ($Force) {
+        foreach ($d in @((Join-Path $c.ProjDir 'bin'), (Join-Path $c.ProjDir 'obj'),
+                         (Join-Path $coreDir 'bin'), (Join-Path $coreDir 'obj'))) {
+            if (Test-Path $d) {
+                try { Remove-Item -Recurse -Force $d -ErrorAction Stop }
+                catch { Write-Host "  (could not fully remove $d : $($_.Exception.Message))" -ForegroundColor DarkYellow }
+            }
+        }
+    }
+
+    $proj = Join-Path $c.ProjDir ($c.Name + '.csproj')
+    Write-Host "Publishing $($c.Name) -> $($c.OutDir)" -ForegroundColor Cyan
+    dotnet publish $proj --configuration Release --output $c.OutDir | Out-Host
+    if ($LASTEXITCODE -ne 0) { return $false }
+    return (Test-Path (Get-Exe $c))
+}
+
+function Write-DeployBat {
+    $cliExe = 'Cli\ProcessLogger.Cli.exe'
+    $feExe  = 'Frontend\ProcessLogger.Frontend.exe'
+    $content = @"
+@echo off
+title ProcessLogger
+rem Generated by $repo\deploy.ps1 - edits here are overwritten.
+set "DEPLOY_PS1=$repo\deploy.ps1"
+if exist "%DEPLOY_PS1%" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%DEPLOY_PS1%"
+    if errorlevel 1 echo Redeploy failed - launching whatever is already in this folder instead.
+) else (
+    echo Source repo not found at "%DEPLOY_PS1%" - launching existing build without redeploying.
+)
+echo Launching ProcessLogger.Cli (background logger, UAC prompt) ...
+start "ProcessLogger Cli" "%~dp0$cliExe"
+echo Launching ProcessLogger.Frontend (viewer) ...
+start "ProcessLogger Frontend" "%~dp0$feExe"
+"@
+    Set-Content -LiteralPath $deployBat -Value $content -Encoding ASCII
+}
+
+# ── Deploy ──────────────────────────────────────────────────────────────────
+New-Item -ItemType Directory -Force -Path $deployDir | Out-Null
+
+$failed = $false
+$didSomething = $false
+foreach ($c in $components) {
+    if (-not ($Force -or (Test-NeedsPublish $c))) { continue }
+    $didSomething = $true
+
+    if (-not (Stop-Component $c)) {
+        Write-Host "$($c.Name) is running and could not be stopped (it runs elevated)." -ForegroundColor Yellow
+        Write-Host "  Skipping its republish - close it (or run this from an elevated shell) and deploy again." -ForegroundColor Yellow
+        continue
+    }
+
+    if (Publish $c) {
+        Write-Host "Deployed $(Get-Exe $c)" -ForegroundColor Green
+    } else {
+        Write-Host "Publishing $($c.Name) FAILED." -ForegroundColor Red
+        $failed = $true
+    }
+}
+
+# deploy.bat is cheap to regenerate; keep it current whenever anything was considered.
+if ($didSomething -or -not (Test-Path $deployBat)) { Write-DeployBat }
+
+if (-not $didSomething) { Write-Host 'ProcessLogger is up to date.' -ForegroundColor DarkGray }
+
+if ($Launch) {
+    foreach ($c in $components) {
+        $exe = Get-Exe $c
+        if (Test-Path $exe) { Start-Process -FilePath $exe -WorkingDirectory $c.OutDir }
+        else { Write-Host "Nothing deployed at $exe." -ForegroundColor Red; $failed = $true }
+    }
+}
+
+if ($failed) { Write-Host 'Deploy FAILED.' -ForegroundColor Red; exit 1 }
+exit 0
