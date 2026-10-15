@@ -1,9 +1,11 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using MindAttic.Log;
 using MindAttic.Log.Extensions;
+using MindAttic.Log.Migration;
+using MindAttic.Vault.Paths;
 using ProcessLogger.Cli;
 using ProcessLogger.Core.Capture;
 using ProcessLogger.Core.Data;
@@ -21,14 +23,20 @@ Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
 builder.Services.AddSingleton(options);
 builder.Services.AddPooledDbContextFactory<ProcessLoggerDbContext>(o => o.UseSqlite($"Data Source={databasePath}"));
 
-// App-owned SQLite tier: the MindAttic_Log table lives in the SAME processlogger.db file EF
-// already owns, not a second file, so it stays covered by whatever already backs up or follows
-// that database. ILogger<T> call sites throughout Core are unchanged.
+// Phase 2 (MindAttic.Log 3.0.0, see its docs/BIBLE.md §1.1): logs now live in their own standalone
+// MindAttic.Log.db under Vault's shared roaming root, not processlogger.db — Phase 1 shared the
+// same file EF owns; that's superseded. ILogger<T> call sites throughout Core are unchanged.
+var logDbPath = VaultPaths.LoggingDbPath("ProcessLogger");
+
+// One-time copy of Phase 1's MindAttic_Log rows out of processlogger.db, then drop that table.
+// Idempotent and a clean no-op on every later startup.
+await MindAtticLogMigrator.MigrateFromSqliteAsync(databasePath, logDbPath, dropSource: true);
+SqliteConnection.ClearAllPools();
+
 builder.Services.AddMindAtticLog(o =>
 {
     o.Application = "ProcessLogger";
-    o.Destination = LogDestination.Sqlite;
-    o.SqlitePath = databasePath;
+    o.DbPath = logDbPath;
 });
 
 builder.Services.AddSingleton<EtwProcessCaptureSource>();
