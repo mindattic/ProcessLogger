@@ -45,3 +45,4 @@ _Nothing recorded yet._
 | PL-T22 | 2026-10-19 | fix | closed | TestDbContextFactory uses Database.EnsureCreated() instead of Migrate(), so the test suite never exercises the real EF Core migrations that production applies at startup | dotnet test ProcessLogger.slnx |
 | PL-T23 | 2026-10-19 | fix | closed | ProcessWatcherService fires unserialized concurrent SaveChangesAsync per process event, causing SQLite 'database is locked' failures under event bursts | a728da4 |
 | PL-T24 | 2026-10-19 | docs | closed | Update USER_STORIES.md | aa77ecd |
+| PL-T25 | 2026-10-19 | chore | open | Archive the fully-landed MindAttic.Log/CSV-export quicksave now that /quickload has resolved it | — |
