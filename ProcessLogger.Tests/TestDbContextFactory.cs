@@ -17,8 +17,12 @@ internal sealed class TestDbContextFactory : IDbContextFactory<ProcessLoggerDbCo
         _path = Path.Combine(Path.GetTempPath(), $"processlogger-tests-{Guid.NewGuid():N}.db");
         _options = ProcessLoggerDbContext.BuildOptions(_path);
 
+        // Migrate(), not EnsureCreated(): production applies the real migrations at startup
+        // (ProcessLoggerHostedService.StartAsync), so the tests must run against that same
+        // schema-build path - otherwise a model change with no matching migration would pass
+        // every test here while still breaking the real app.
         using var db = new ProcessLoggerDbContext(_options);
-        db.Database.EnsureCreated();
+        db.Database.Migrate();
     }
 
     public ProcessLoggerDbContext CreateDbContext() => new(_options);
