@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
@@ -82,9 +83,14 @@ public sealed class FocusWatcherService : IDisposable
         {
             processName = Process.GetProcessById((int)pid).ProcessName;
         }
-        catch (ArgumentException)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
         {
-            // Process already exited between the event firing and us looking it up.
+            // ArgumentException: no such PID (including a lookup failure that leaves pid at its
+            // default 0 - the System Idle Process, which exists but can't be queried as this
+            // user). InvalidOperationException: it exited between the event firing and us looking
+            // it up. Win32Exception: it's a protected/elevated process (e.g. a UAC prompt or a
+            // system dialog) we can't query. This callback runs synchronously inside the native
+            // WinEvent hook, so leaving any of these uncaught risks crashing the whole process.
         }
 
         _ = RecordFocusChangeAsync((int)pid, processName, title, DateTime.UtcNow);
