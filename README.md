@@ -4,7 +4,7 @@ Catch whatever stole focus from your game: ProcessLogger records every Windows p
 
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4) ![Windows](https://img.shields.io/badge/Platform-Windows-0078D6) ![ETW + WMI](https://img.shields.io/badge/Capture-ETW%20%2B%20WMI-5c2d91) ![SQLite](https://img.shields.io/badge/SQLite-EF%20Core-003B57) ![Status working](https://img.shields.io/badge/Status-working-2f7a4f)
 
-![ProcessLogger icon: a clipboard checklist](assets/process.png)
+![The viewer's Processes tab: include and exclude filters, match mode, row count, and columns from Name to Source](docs/images/viewer-toolbar.png)
 
 A window flashes up and your full-screen game drops to the desktop. Task Manager shows nothing, because whatever did it lived for half a second. ProcessLogger is a pair of small Windows apps that answer that question: a background logger that writes every process lifecycle and focus change to a local SQLite database, and a viewer to search it.
 
@@ -19,8 +19,6 @@ A window flashes up and your full-screen game drops to the desktop. Task Manager
 
 ## Features
 
-![The viewer's Processes tab: include and exclude filters, match mode, row count, and columns from Name to Source](docs/images/viewer-toolbar.png)
-
 Logger (`ProcessLogger.Cli`):
 
 - **ETW kernel process trace** (the NT Kernel Logger session, via TraceEvent). The kernel raises these events as part of process creation and exit, so nothing is missed between polls.
@@ -33,8 +31,9 @@ Logger (`ProcessLogger.Cli`):
 Viewer (`ProcessLogger.Frontend`):
 
 - **Processes** and **Focus** tabs over the same database.
-- **Include and exclude** text filters with Partial text, Exact string or Regex matching, and the last 50 to 1000 rows.
+- **Include and exclude** text filters with Partial text, Exact string or Regex matching, and the last 50 to 1000 rows on Processes (50 to 500 on Focus).
 - **Per-column value filters,** sortable columns (newest first by default, with Reset sort) and resizable column widths that are remembered across restarts.
+- **Export CSV** on either tab writes exactly the filtered, sorted rows on screen to a file you choose.
 - **Auto-refresh** every 1 second to 20 minutes, and a System, Light or Dark theme.
 
 ## Quick start
@@ -99,6 +98,7 @@ Notes on the data:
 - A sample count of 0 means the process lived shorter than one sampler tick.
 - Path and command line are only reliably supplied by the ETW source.
 - A stop for a process that was already running when the logger started is ignored; there is no row to close.
+- The logger's own operational logging (every `ILogger<T>` call site in Core and the Cli) goes through MindAttic.Log into its own SQLite database next to Vault's shared roaming root, not into `processlogger.db`; there is nothing to configure, and rows from the older, shared-file layout migrate across automatically the first time the new version runs.
 
 ## Building and testing
 
@@ -107,7 +107,7 @@ dotnet build ProcessLogger.slnx
 dotnet test ProcessLogger.Tests
 ```
 
-The NUnit tests cover the reconciling watcher (with a fake capture source) and the process and focus query services, against SQLite. The build treats warnings as errors (`Directory.Build.props`).
+The NUnit tests cover the reconciling watcher (with a fake capture source), the process and focus query services against SQLite, and the MindAttic.Log integration (logging lands in its own database, and Phase 1 rows migrate across). The build treats warnings as errors (`Directory.Build.props`).
 
 ## Project layout
 
@@ -124,9 +124,11 @@ The NUnit tests cover the reconciling watcher (with a fake capture source) and t
 - Only one NT Kernel Logger session can exist system-wide. If another tool owns it, the ETW source logs an error and stays off, and WMI carries on alone (WMI has about 1 to 2 seconds of startup latency and can drop rapid bursts).
 - The viewer always opens the default database path; a custom `DatabasePath` in the logger's settings is not picked up by the viewer.
 - Window titles are best effort: background and console processes have none, and a GUI window may not exist yet when it is sampled.
+- The viewer's own diagnostic trace for WebView2 and script errors still writes to a plain text file under `%TEMP%`, not through MindAttic.Log like the rest of the app.
 
 ## Documentation
 
+- [docs/USER_STORIES.md](docs/USER_STORIES.md): this repo's ticket log and story index.
 - [AGENTS.md](AGENTS.md): entry point for AI agents working in this repo; it points at the shared MindAttic agent standard.
 
 ## License
