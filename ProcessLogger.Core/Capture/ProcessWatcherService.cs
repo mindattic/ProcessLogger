@@ -24,6 +24,7 @@ public sealed class ProcessWatcherService : IDisposable
     private readonly MemorySamplerService _memorySampler;
     private readonly ILogger<ProcessWatcherService> _logger;
     private readonly ConcurrentDictionary<int, PendingProcess> _active = new();
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
 
     public ProcessWatcherService(
         IEnumerable<IProcessCaptureSource> allSources,
@@ -132,6 +133,7 @@ public sealed class ProcessWatcherService : IDisposable
 
         var sample = _memorySampler.StopSampling(entry.ProcessId);
 
+        await _writeGate.WaitAsync();
         try
         {
             await using var db = await _dbContextFactory.CreateDbContextAsync();
@@ -156,6 +158,10 @@ public sealed class ProcessWatcherService : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to record process exit for PID {ProcessId}.", entry.ProcessId);
+        }
+        finally
+        {
+            _writeGate.Release();
         }
     }
 
@@ -203,7 +209,6 @@ public sealed class ProcessWatcherService : IDisposable
             // Already exited (or inaccessible) by the time we looked it up.
         }
 
-        await using var db = await _dbContextFactory.CreateDbContextAsync();
         var row = new ProcessEvent
         {
             ProcessId = entry.ProcessId,
@@ -216,8 +221,18 @@ public sealed class ProcessWatcherService : IDisposable
             Source = entry.SourceSeen,
             OpenedUtc = entry.OpenedUtc,
         };
-        db.ProcessEvents.Add(row);
-        await db.SaveChangesAsync();
+
+        await _writeGate.WaitAsync();
+        try
+        {
+            await using var db = await _dbContextFactory.CreateDbContextAsync();
+            db.ProcessEvents.Add(row);
+            await db.SaveChangesAsync();
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
 
         _memorySampler.StartSampling(entry.ProcessId);
 
@@ -244,5 +259,6 @@ public sealed class ProcessWatcherService : IDisposable
         {
             source.Dispose();
         }
+        _writeGate.Dispose();
     }
 }
