@@ -44,4 +44,4 @@ _Nothing recorded yet._
 | PL-T21 | 2026-10-19 | fix | closed | FocusWatcherService.OnWinEvent only catches ArgumentException around Process.GetProcessById(...).ProcessName inside a native WinEvent hook callback; an uncaught Win32Exception/InvalidOperationException (e.g. PID 0 Idle process, protected/elevated foreground windows) can crash the app | manual code review, FocusWatcherService.cs |
 | PL-T22 | 2026-10-19 | fix | closed | TestDbContextFactory uses Database.EnsureCreated() instead of Migrate(), so the test suite never exercises the real EF Core migrations that production applies at startup | dotnet test ProcessLogger.slnx |
 | PL-T23 | 2026-10-19 | fix | closed | ProcessWatcherService fires unserialized concurrent SaveChangesAsync per process event, causing SQLite 'database is locked' failures under event bursts | a728da4 |
-| PL-T24 | 2026-10-19 | docs | open | Update USER_STORIES.md | — |
+| PL-T24 | 2026-10-19 | docs | closed | Update USER_STORIES.md | aa77ecd |
