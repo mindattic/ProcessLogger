@@ -83,6 +83,29 @@ public class ProcessWatcherServiceTests
     }
 
     [Test]
+    public async Task BothSources_WmiFirst_StillPrefersEtwPath()
+    {
+        // Same scenario as BothSources_ConsolidateIntoOneRow, but with the arrival order flipped:
+        // WMI (with its own resolved path) reports first, then ETW. The reconciler must still end
+        // up with ETW's path - "preferring ETW's richer path" (see PendingProcess.Merge) shouldn't
+        // depend on which source happened to arrive first.
+        var pid = NextPid();
+        var opened = DateTime.UtcNow;
+        _wmi.RaiseStart(new ProcessLifecycleEvent(
+            ProcessLifecycleKind.Started, pid, null, "cmd.exe", @"C:\Windows\cmd.exe", null, opened, CaptureSource.Wmi));
+        _etw.RaiseStart(new ProcessLifecycleEvent(
+            ProcessLifecycleKind.Started, pid, null, "cmd.exe", @"C:\Windows\System32\cmd.exe",
+            @"C:\Windows\System32\cmd.exe /c dir", opened, CaptureSource.Etw));
+
+        await Task.Delay(150);
+
+        var rows = await GetRowsAsync();
+        Assert.That(rows, Has.Count.EqualTo(1));
+        Assert.That(rows[0].Source, Is.EqualTo(CaptureSource.Both));
+        Assert.That(rows[0].Path, Is.EqualTo(@"C:\Windows\System32\cmd.exe"));
+    }
+
+    [Test]
     public async Task Stop_ClosesTheOpenRow()
     {
         var pid = NextPid();

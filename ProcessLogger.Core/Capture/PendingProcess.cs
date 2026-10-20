@@ -38,7 +38,20 @@ internal sealed class PendingProcess
     {
         SourceSeen |= evt.Source;
         ParentProcessId ??= evt.ParentProcessId;
-        Path ??= evt.Path;
+
+        // ETW's path is the richer one (see ProcessEvent.Path), so it always wins over whatever
+        // the other source already filled in - not just when Path is still null. Without this,
+        // a WMI event that happens to arrive first "locks in" its path and ETW's later, better
+        // value is silently dropped.
+        if (evt.Source == CaptureSource.Etw && evt.Path is not null)
+        {
+            Path = evt.Path;
+        }
+        else
+        {
+            Path ??= evt.Path;
+        }
+
         CommandLine ??= evt.CommandLine;
     }
 }
