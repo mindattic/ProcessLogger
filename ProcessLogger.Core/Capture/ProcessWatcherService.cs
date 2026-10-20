@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -76,7 +77,7 @@ public sealed class ProcessWatcherService : IDisposable
 
         if (bothSeen)
         {
-            _ = GetOrCreatePersistTask(existing);
+            _ = PersistQuietlyAsync(existing);
         }
     }
 
@@ -95,12 +96,40 @@ public sealed class ProcessWatcherService : IDisposable
     private async Task ScheduleFinalizeAsync(PendingProcess entry)
     {
         await Task.Delay(_reconcileWindow);
-        await GetOrCreatePersistTask(entry);
+        await PersistQuietlyAsync(entry);
+    }
+
+    /// <summary>Awaits the shared persist task for a fire-and-forget caller that doesn't need the
+    /// resulting row id, logging (instead of losing as an unobserved task exception) any failure
+    /// - e.g. the database being briefly unavailable.</summary>
+    private async Task PersistQuietlyAsync(PendingProcess entry)
+    {
+        try
+        {
+            await GetOrCreatePersistTask(entry);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to persist process start for PID {ProcessId}.", entry.ProcessId);
+        }
     }
 
     private async Task HandleStopAsync(PendingProcess entry, ProcessLifecycleEvent stopEvt)
     {
-        var dbId = await GetOrCreatePersistTask(entry);
+        long dbId;
+        try
+        {
+            dbId = await GetOrCreatePersistTask(entry);
+        }
+        catch (Exception ex)
+        {
+            // The row was never written, so there's nothing to close out - but the process still
+            // exited, so its memory-sampler tracker must still be torn down, or it leaks forever.
+            _logger.LogError(ex, "Failed to persist process start before recording exit for PID {ProcessId}.", entry.ProcessId);
+            _memorySampler.StopSampling(entry.ProcessId);
+            return;
+        }
+
         var sample = _memorySampler.StopSampling(entry.ProcessId);
 
         try
@@ -152,9 +181,12 @@ public sealed class ProcessWatcherService : IDisposable
             {
                 parentName = Process.GetProcessById(parentPid).ProcessName;
             }
-            catch (ArgumentException)
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
             {
-                // Parent already exited by the time we looked it up — best-effort only.
+                // ArgumentException: no such PID at all. InvalidOperationException: it exited
+                // between the lookup and reading this property. Win32Exception: it's a protected/
+                // elevated process we can't query as this user. All three are best-effort misses,
+                // not failures.
             }
         }
 
@@ -166,9 +198,9 @@ public sealed class ProcessWatcherService : IDisposable
             var mainWindowTitle = Process.GetProcessById(entry.ProcessId).MainWindowTitle;
             title = string.IsNullOrEmpty(mainWindowTitle) ? null : mainWindowTitle;
         }
-        catch (ArgumentException)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
         {
-            // Already exited by the time we looked it up.
+            // Already exited (or inaccessible) by the time we looked it up.
         }
 
         await using var db = await _dbContextFactory.CreateDbContextAsync();
