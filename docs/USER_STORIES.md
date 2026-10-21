@@ -6,7 +6,7 @@ layer: stories
 status: living
 updated: 2026-10-12
 ---
-<!-- GENERATED from MindAttic.Workflow/data/workflow.db by `workflow db render`. Do not edit: this file is rewritten from the database; change stories and tickets with the workflow CLI. -->
+<!-- GENERATED from MindAttic.Tickets/data/Tickets.db by `tickets db render`. Do not edit: this file is rewritten from the database; change stories and tickets with the tickets CLI. -->
 
 # ProcessLogger — User Stories
 > ✅ done (shipped & tested) · 🟡 partial · ⬜ planned. Every ✅ cites the test.
@@ -46,3 +46,4 @@ _Nothing recorded yet._
 | PL-T23 | 2026-10-19 | fix | closed | ProcessWatcherService fires unserialized concurrent SaveChangesAsync per process event, causing SQLite 'database is locked' failures under event bursts | a728da4 |
 | PL-T24 | 2026-10-19 | docs | closed | Update USER_STORIES.md | aa77ecd |
 | PL-T25 | 2026-10-19 | chore | closed | Archive the fully-landed MindAttic.Log/CSV-export quicksave now that /quickload has resolved it | 55589a9 |
+| PL-T26 | 2026-10-20 | docs | open | Publish ProcessLogger docs to GitHub Pages via the shared Toolkit DocFX pipeline: run adopt-docs-site.ps1 (README.md as home page, docs/*.md as articles, API reference only where the code builds in CI), enable Pages with build_type=workflow, set the repo homepage URL, retire tools/build-readme.ps1 and README.htm, confirm the docs Actions run is green and https://mindattic.github.io/ProcessLogger/ returns 200. Depends on MAT-T8. | — |
