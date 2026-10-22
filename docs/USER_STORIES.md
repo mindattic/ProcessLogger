@@ -37,7 +37,7 @@ _Nothing recorded yet._
 | PL-T14 | 2026-10-16 | chore | open | Clean up code and docs: remove dead code, stale comments and outdated or duplicated docs, and simplify where behaviour doesn't change (/simplify); tests stay green | user request 2026-10-16: approved repo sweep |
 | PL-T15 | 2026-10-16 | docs | closed | Bring README.md up to date with the code as it is now (what it is, setup, usage, commands, current state), following codex-standard/README-STYLE.md; README.htm regenerated if the repo has one | a195fa9 |
 | PL-T16 | 2026-10-16 | docs | closed | Update USER_STORIES.md | — |
-| PL-T17 | 2026-10-19 | chore | open | Convert tracked source files to LF line endings via .gitattributes, per HOUSE-LAW-13 (low priority) | — |
+| PL-T17 | 2026-10-19 | chore | wont-do | Convert tracked source files to LF line endings via .gitattributes, per HOUSE-LAW-13 (low priority) | — |
 | PL-T18 | 2026-10-19 | fix | closed | Unused System.Security.Cryptography.Xml package reference in ProcessLogger.Core pulls in vulnerable System.Security.Cryptography.Pkcs 10.0.12, failing dotnet build/restore via NuGet audit errors | dotnet build ProcessLogger.slnx |
 | PL-T19 | 2026-10-19 | fix | closed | PendingProcess.Merge keeps whichever source's Path arrives first instead of preferring ETW's, contradicting the documented reconciler behavior (README/class docs) | ProcessWatcherServiceTests.BothSources_WmiFirst_StillPrefersEtwPath |
 | PL-T20 | 2026-10-19 | fix | closed | ProcessWatcherService.PersistAsync only catches ArgumentException around Process.GetProcessById(...).ProcessName/.MainWindowTitle, so Win32Exception/InvalidOperationException silently drop a process event and (in HandleStopAsync) skip MemorySamplerService.StopSampling, leaking the tracker | dotnet test ProcessLogger.slnx |
@@ -47,3 +47,4 @@ _Nothing recorded yet._
 | PL-T24 | 2026-10-19 | docs | closed | Update USER_STORIES.md | aa77ecd |
 | PL-T25 | 2026-10-19 | chore | closed | Archive the fully-landed MindAttic.Log/CSV-export quicksave now that /quickload has resolved it | 55589a9 |
 | PL-T26 | 2026-10-20 | docs | open | Publish ProcessLogger docs to GitHub Pages via the shared Toolkit DocFX pipeline: run adopt-docs-site.ps1 (README.md as home page, docs/*.md as articles, API reference only where the code builds in CI), enable Pages with build_type=workflow, set the repo homepage URL, retire tools/build-readme.ps1 and README.htm, confirm the docs Actions run is green and https://mindattic.github.io/ProcessLogger/ returns 200. Depends on MAT-T8. | — |
+| PL-T27 | 2026-10-22 | docs | closed | Update USER_STORIES.md | — |
