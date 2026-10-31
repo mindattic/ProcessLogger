@@ -43,10 +43,10 @@ Prerequisites: Windows, the .NET 10 SDK, the Microsoft Edge WebView2 runtime, an
 ```powershell
 git clone https://github.com/mindattic/ProcessLogger.git
 cd ProcessLogger
-powershell -ExecutionPolicy Bypass -File .un.ps1 -Launch
+powershell -ExecutionPolicy Bypass -File .\run.ps1 -Launch
 ```
 
-`run.ps1` publishes both apps in Release to `C:\Apps\ProcessLogger\Cli` and `C:\Apps\ProcessLogger\Frontend` and, with `-Launch`, starts them. It only republishes an app whose source changed since its last deploy; `-Force` does a clean rebuild of both. Every run also writes `C:\Apps\ProcessLoggerun.bat` (`run.ps1 -LauncherOnly` writes just that); point a desktop shortcut at it. Double-clicked, it opens a menu: **1) Deploy & Run** (runs `run.ps1 -Force`, then starts both apps) or **2) Run** (starts the deployed apps as they are). Windows shows a UAC prompt for the logger, which is marked `requireAdministrator` in its manifest. When it is running, the logger console shows:
+`run.ps1` publishes both apps in Release to `C:\Apps\ProcessLogger\Cli` and `C:\Apps\ProcessLogger\Frontend` and, with `-Launch`, starts them. It only republishes an app whose source changed since its last deploy; `-Force` does a clean rebuild of both. Every run also writes `C:\Apps\ProcessLogger\run.bat` (`run.ps1 -LauncherOnly` writes just that); point a desktop shortcut at it. Double-clicked, it opens a menu: **1) Deploy & Run** (runs `run.ps1 -Force`, then starts both apps) or **2) Run** (starts the deployed apps as they are). Windows shows a UAC prompt for the logger, which is marked `requireAdministrator` in its manifest. When it is running, the logger console shows:
 
 ```text
 ProcessLogger is watching. Press Ctrl+C to stop.
