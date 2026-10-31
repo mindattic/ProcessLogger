@@ -15,6 +15,7 @@
     <PackageReference Include="System.Management" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="MindAttic.Vault" Version="7.0.0" />
     <!-- Not used directly: Microsoft.EntityFrameworkCore.Design (design-time only, via
          Microsoft.Build.Tasks.Core) transitively floors these at a vulnerable 9.0.0. Pinned here
          at the latest patched release purely to force that floor up and keep NuGet's audit clean. -->

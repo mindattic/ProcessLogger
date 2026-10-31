@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using MindAttic.Log.Extensions;
 using MindAttic.Log.Migration;
 using MindAttic.Vault.Paths;
+using MindAttic.Vault.Settings.Manifest;
 using ProcessLogger.Cli;
 using ProcessLogger.Core.Capture;
 using ProcessLogger.Core.Data;
@@ -15,9 +16,9 @@ using ProcessLogger.Core.Options;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-var options = new ProcessLoggerOptions();
-builder.Configuration.GetSection(ProcessLoggerOptions.SectionName).Bind(options);
-var databasePath = options.DatabasePath ?? ProcessLoggerOptions.DefaultDatabasePath;
+var options = ProcessLoggerOptions.Load(builder.Configuration.GetSection(ProcessLoggerOptions.SectionName));
+if (SettingsManifestCommand.TryRun<ProcessLoggerOptions>(args)) return;
+var databasePath = options.EffectiveDatabasePath;
 Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
 
 builder.Services.AddSingleton(options);

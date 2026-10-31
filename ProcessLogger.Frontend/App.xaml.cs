@@ -16,7 +16,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        var databasePath = ProcessLoggerOptions.DefaultDatabasePath;
+        var databasePath = ProcessLoggerOptions.Load().EffectiveDatabasePath;
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
 
         var services = new ServiceCollection();
