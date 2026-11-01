@@ -9,7 +9,7 @@ namespace ProcessLogger.Core.Options;
 /// ProcessLogger's settings, per machine in <c>%LOCALAPPDATA%\MindAttic\ProcessLogger\settings.json</c>
 /// and edited in MindAttic.Vault.Desktop. Read once at start; changes apply on the next start.
 /// </summary>
-[SettingsApp(AppId, "Process Logger", Local = true, Icon = "activity",
+[SettingsApp(AppId, "ProcessLogger", Local = true, Icon = "activity",
     Description = "Records which processes start, stop and take focus on this PC.")]
 public sealed class ProcessLoggerOptions
 {
