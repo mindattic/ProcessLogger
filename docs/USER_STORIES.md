@@ -51,3 +51,8 @@ _Nothing recorded yet._
 | PL-T28 | 2026-10-23 | fix | open | The logger's MindAttic.Log database grows ~1.7 GB a day: C:\Users\ryand\AppData\Roaming\MindAttic\Logging\ProcessLogger\MindAttic.Log.db holds 1,067,472 Information rows from 19 hours (2026-10-19T23:27Z..2026-10-20T18:32Z), 641,389 of them EF Core 'Executed DbCommand' lines (Microsoft.EntityFrameworkCore.Database.Command logged at Information for every insert) and ~426,000 per-process '+ [Source] Name' / '- Name ran ...ms' lines that duplicate the ProcessEvents rows already in processlogger.db; raise Microsoft.EntityFrameworkCore to Warning and drop the per-process lines to Debug so the operational log holds only lifecycle, warnings and errors, with a test that a captured process start/stop writes no Information row to MindAttic.Log (found by audit M.ORCH-T657) | — |
 | PL-T29 | 2026-10-23 | docs | closed | many billions of tokens | — |
 | PL-T30 | 2026-10-24 | docs | closed | Update USER_STORIES.md | — |
+| PL-T31 | 2026-10-31 | feature | closed | LAMP: move ProcessLogger's app-level settings and keys to MindAttic.Vault.Desktop (manifest, LoadOrSeed, shared named keys, cog opens Vault) | e8cfff5 LampSettingsTests (26/26) |
+| PL-T32 | 2026-10-31 | docs | closed | README: replace the raw CRs the MAT-T68 rename wrote for '\r' in '\run.ps1' / '\run.bat' | 6c8698d |
+| PL-T33 | 2026-10-31 | chore | closed | Vault tab named after the repo: SettingsApp DisplayName 'Process Logger' -> 'ProcessLogger' | M.VALT-T75 decd9a4 |
+| PL-T34 | 2026-10-31 | chore | closed | Vault tab named after the repo: 'Process Logger' -> 'ProcessLogger' | M.VALT-T78 decd9a4 (manifest regenerated, no new commit) |
+| PL-T35 | 2026-10-31 | docs | closed | Update USER_STORIES.md | — |
