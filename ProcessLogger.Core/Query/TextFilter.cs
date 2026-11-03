@@ -22,7 +22,15 @@ public static class TextFilterExtensions
             return false;
         }
 
-        return filter!.Mode switch
+        // Process names: rows written before names were normalized say "cmd" where newer ones say "cmd.exe".
+        // Match either spelling so a filter written for one finds both.
+        return MatchesOne(filter!, value)
+            || (ProcessLogger.Core.Capture.ProcessNames.AlternateSpelling(value) is { } alternate && MatchesOne(filter!, alternate));
+    }
+
+    private static bool MatchesOne(TextFilter filter, string value)
+    {
+        return filter.Mode switch
         {
             TextFilterMode.ExactString => string.Equals(value, filter.Text, StringComparison.OrdinalIgnoreCase),
             TextFilterMode.Regex => Regex.IsMatch(value, filter.Text!, RegexOptions.IgnoreCase),

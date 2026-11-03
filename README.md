@@ -23,7 +23,7 @@ Logger (`ProcessLogger.Cli`):
 
 - **ETW kernel process trace** (the NT Kernel Logger session, via TraceEvent). The kernel raises these events as part of process creation and exit, so nothing is missed between polls.
 - **WMI process trace** (`Win32_ProcessStartTrace` and `Win32_ProcessStopTrace`) as a redundant cross-check and as the fallback when another tool already owns the kernel session.
-- **Reconciler:** if both sources report the same PID within 250 ms they are merged into one row (preferring ETW's richer path and command line), and the Source column reads `Both`; otherwise it reads `Etw` or `Wmi`.
+- **Reconciler:** if both sources report the same PID within 250 ms they are merged into one row (preferring ETW's richer path and command line), and the Source column reads `Both`; otherwise it reads `Etw` or `Wmi`. A second source that confirms the same process later (WMI runs 1-2 s behind ETW) still upgrades its row to `Both`, while the process runs or up to 5 s after its start once it has exited. Names are stored with `.exe` whichever source reported first (ETW alone omits it); name filters match either spelling, so older rows without `.exe` still match.
 - **Memory sampling** every 50 ms while a process is alive (up to 200 samples): peak working set, peak private bytes, final working set and the sample count.
 - **Window title** of the process's main window, sampled shortly after start (best effort).
 - **Focus log:** a `SetWinEventHook` foreground hook records each window that takes focus, with its process, title, and focused and lost times.

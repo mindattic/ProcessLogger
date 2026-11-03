@@ -28,8 +28,14 @@ public sealed class ProcessWatcherService : IDisposable
     /// <summary>Which sources had reported each recently exited PID. The WMI source runs ~1-2s
     /// behind ETW, so for a short-lived process its start can arrive after ETW already reported the
     /// exit; without this, that late start would open a second, duplicate row for the same process.</summary>
-    private readonly ConcurrentDictionary<int, CaptureSource> _recentlyClosed = new();
+    private readonly ConcurrentDictionary<int, ClosedProcess> _recentlyClosed = new();
     private static readonly TimeSpan LateStartGrace = TimeSpan.FromSeconds(10);
+
+    /// <summary>How far after the first source's start a late report from the other source still counts as
+    /// confirming the same process (WMI runs ~1-2s behind ETW), upgrading the already-written row to Both.</summary>
+    private static readonly TimeSpan LateConfirmWindow = TimeSpan.FromSeconds(5);
+
+    private sealed record ClosedProcess(CaptureSource Seen, PendingProcess Entry);
     private readonly SemaphoreSlim _writeGate = new(1, 1);
 
     public ProcessWatcherService(
@@ -65,12 +71,20 @@ public sealed class ProcessWatcherService : IDisposable
     {
         var entry = new PendingProcess(evt);
         if (!_active.ContainsKey(evt.ProcessId)
-            && _recentlyClosed.TryGetValue(evt.ProcessId, out var closedSources)
-            && (closedSources & evt.Source) == 0)
+            && _recentlyClosed.TryGetValue(evt.ProcessId, out var closed)
+            && (closed.Seen & evt.Source) == 0)
         {
             // The other source's late report of a process that has already exited and been
             // recorded - not a new process (a reused PID would be reported again by the source
-            // that already saw the old one).
+            // that already saw the old one). Within a few seconds it confirms that row: mark it Both.
+            if (IsLateConfirmation(closed.Entry, evt))
+            {
+                lock (closed.Entry.Gate)
+                {
+                    closed.Entry.Merge(evt);
+                }
+                _ = UpgradeSourceQuietlyAsync(closed.Entry);
+            }
             return;
         }
 
@@ -113,7 +127,56 @@ public sealed class ProcessWatcherService : IDisposable
 
         if (bothSeen)
         {
-            _ = PersistQuietlyAsync(existing);
+            // Persists now if the reconcile window is still open; if the row was already written as
+            // single-source (the other source confirmed late), this upgrades it to Both.
+            _ = UpgradeSourceQuietlyAsync(existing);
+        }
+    }
+
+    private static bool IsLateConfirmation(PendingProcess entry, ProcessLifecycleEvent evt)
+    {
+        string name;
+        lock (entry.Gate)
+        {
+            name = entry.Name;
+        }
+        return (evt.TimestampUtc - entry.OpenedUtc).Duration() <= LateConfirmWindow
+               && ProcessNames.SameImage(name, evt.Name);
+    }
+
+    /// <summary>Makes the persisted row's Source match what the entry has seen so far (a late second
+    /// source turns a single-source row into Both). Logs rather than throws.</summary>
+    private async Task UpgradeSourceQuietlyAsync(PendingProcess entry)
+    {
+        try
+        {
+            var dbId = await GetOrCreatePersistTask(entry);
+            CaptureSource seen;
+            lock (entry.Gate)
+            {
+                seen = entry.SourceSeen;
+            }
+
+            await _writeGate.WaitAsync();
+            try
+            {
+                await using var db = await _dbContextFactory.CreateDbContextAsync();
+                var row = await db.ProcessEvents.FindAsync(dbId);
+                if (row is null || (row.Source | seen) == row.Source)
+                {
+                    return;
+                }
+                row.Source |= seen;
+                await db.SaveChangesAsync();
+            }
+            finally
+            {
+                _writeGate.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to record the second capture source for PID {ProcessId}.", entry.ProcessId);
         }
     }
 
@@ -131,8 +194,9 @@ public sealed class ProcessWatcherService : IDisposable
         {
             seen = entry.SourceSeen;
         }
-        _recentlyClosed[evt.ProcessId] = seen;
-        _ = ForgetClosedAsync(evt.ProcessId, seen);
+        var closed = new ClosedProcess(seen, entry);
+        _recentlyClosed[evt.ProcessId] = closed;
+        _ = ForgetClosedAsync(evt.ProcessId, closed);
 
         // Stop sampling now, at the exit, not after the persist completes: by then the PID may
         // already belong to a new process whose own sampler this would tear down.
@@ -149,10 +213,10 @@ public sealed class ProcessWatcherService : IDisposable
         _ = ScheduleFinalizeAsync(entry);
     }
 
-    private async Task ForgetClosedAsync(int processId, CaptureSource seen)
+    private async Task ForgetClosedAsync(int processId, ClosedProcess closed)
     {
         await Task.Delay(LateStartGrace);
-        _recentlyClosed.TryRemove(new KeyValuePair<int, CaptureSource>(processId, seen));
+        _recentlyClosed.TryRemove(new KeyValuePair<int, ClosedProcess>(processId, closed));
     }
 
     private async Task ScheduleFinalizeAsync(PendingProcess entry)

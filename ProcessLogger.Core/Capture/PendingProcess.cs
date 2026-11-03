@@ -27,7 +27,8 @@ internal sealed class PendingProcess
         ProcessId = evt.ProcessId;
         OpenedUtc = evt.TimestampUtc;
         ParentProcessId = evt.ParentProcessId;
-        Name = evt.Name;
+        // ETW says "cmd", WMI "cmd.exe": store one spelling whichever source arrived first.
+        Name = ProcessNames.Normalize(evt.Name, evt.Path);
         Path = evt.Path;
         CommandLine = evt.CommandLine;
         SourceSeen = evt.Source;
