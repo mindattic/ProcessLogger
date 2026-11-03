@@ -24,6 +24,12 @@ public sealed class ProcessWatcherService : IDisposable
     private readonly MemorySamplerService _memorySampler;
     private readonly ILogger<ProcessWatcherService> _logger;
     private readonly ConcurrentDictionary<int, PendingProcess> _active = new();
+
+    /// <summary>Which sources had reported each recently exited PID. The WMI source runs ~1-2s
+    /// behind ETW, so for a short-lived process its start can arrive after ETW already reported the
+    /// exit; without this, that late start would open a second, duplicate row for the same process.</summary>
+    private readonly ConcurrentDictionary<int, CaptureSource> _recentlyClosed = new();
+    private static readonly TimeSpan LateStartGrace = TimeSpan.FromSeconds(10);
     private readonly SemaphoreSlim _writeGate = new(1, 1);
 
     public ProcessWatcherService(
@@ -58,14 +64,43 @@ public sealed class ProcessWatcherService : IDisposable
     private void OnProcessStarted(object? sender, ProcessLifecycleEvent evt)
     {
         var entry = new PendingProcess(evt);
+        if (!_active.ContainsKey(evt.ProcessId)
+            && _recentlyClosed.TryGetValue(evt.ProcessId, out var closedSources)
+            && (closedSources & evt.Source) == 0)
+        {
+            // The other source's late report of a process that has already exited and been
+            // recorded - not a new process (a reused PID would be reported again by the source
+            // that already saw the old one).
+            return;
+        }
+
         if (_active.TryAdd(evt.ProcessId, entry))
         {
-            _ = ScheduleFinalizeAsync(entry);
+            BeginTracking(entry);
             return;
         }
 
         if (!_active.TryGetValue(evt.ProcessId, out var existing))
         {
+            return;
+        }
+
+        bool sameSourceAgain;
+        lock (existing.Gate)
+        {
+            sameSourceAgain = (existing.SourceSeen & evt.Source) != 0;
+        }
+
+        if (sameSourceAgain)
+        {
+            // The same source reporting a start for a PID it already reported means the old
+            // process exited without a stop we saw (WMI can drop events) and Windows reused its
+            // PID. Merging would silently swallow the new process; track it as its own row.
+            if (_active.TryUpdate(evt.ProcessId, entry, existing))
+            {
+                _memorySampler.StopSampling(evt.ProcessId);
+                BeginTracking(entry);
+            }
             return;
         }
 
@@ -91,7 +126,33 @@ public sealed class ProcessWatcherService : IDisposable
             return;
         }
 
-        _ = HandleStopAsync(entry, evt);
+        CaptureSource seen;
+        lock (entry.Gate)
+        {
+            seen = entry.SourceSeen;
+        }
+        _recentlyClosed[evt.ProcessId] = seen;
+        _ = ForgetClosedAsync(evt.ProcessId, seen);
+
+        // Stop sampling now, at the exit, not after the persist completes: by then the PID may
+        // already belong to a new process whose own sampler this would tear down.
+        var sample = _memorySampler.StopSampling(evt.ProcessId);
+        _ = HandleStopAsync(entry, evt, sample);
+    }
+
+    /// <summary>Starts memory sampling at the process's start (so a process that lives shorter than
+    /// the reconcile window still gets samples) and schedules its reconcile-and-persist.</summary>
+    private void BeginTracking(PendingProcess entry)
+    {
+        _recentlyClosed.TryRemove(entry.ProcessId, out _);
+        _memorySampler.StartSampling(entry.ProcessId);
+        _ = ScheduleFinalizeAsync(entry);
+    }
+
+    private async Task ForgetClosedAsync(int processId, CaptureSource seen)
+    {
+        await Task.Delay(LateStartGrace);
+        _recentlyClosed.TryRemove(new KeyValuePair<int, CaptureSource>(processId, seen));
     }
 
     private async Task ScheduleFinalizeAsync(PendingProcess entry)
@@ -115,7 +176,7 @@ public sealed class ProcessWatcherService : IDisposable
         }
     }
 
-    private async Task HandleStopAsync(PendingProcess entry, ProcessLifecycleEvent stopEvt)
+    private async Task HandleStopAsync(PendingProcess entry, ProcessLifecycleEvent stopEvt, MemorySample sample)
     {
         long dbId;
         try
@@ -124,14 +185,10 @@ public sealed class ProcessWatcherService : IDisposable
         }
         catch (Exception ex)
         {
-            // The row was never written, so there's nothing to close out - but the process still
-            // exited, so its memory-sampler tracker must still be torn down, or it leaks forever.
+            // The row was never written, so there's nothing to close out.
             _logger.LogError(ex, "Failed to persist process start before recording exit for PID {ProcessId}.", entry.ProcessId);
-            _memorySampler.StopSampling(entry.ProcessId);
             return;
         }
-
-        var sample = _memorySampler.StopSampling(entry.ProcessId);
 
         await _writeGate.WaitAsync();
         try
@@ -185,7 +242,8 @@ public sealed class ProcessWatcherService : IDisposable
         {
             try
             {
-                parentName = Process.GetProcessById(parentPid).ProcessName;
+                using var parent = Process.GetProcessById(parentPid);
+                parentName = parent.ProcessName;
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
             {
@@ -201,7 +259,8 @@ public sealed class ProcessWatcherService : IDisposable
         string? title = null;
         try
         {
-            var mainWindowTitle = Process.GetProcessById(entry.ProcessId).MainWindowTitle;
+            using var process = Process.GetProcessById(entry.ProcessId);
+            var mainWindowTitle = process.MainWindowTitle;
             title = string.IsNullOrEmpty(mainWindowTitle) ? null : mainWindowTitle;
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
@@ -233,8 +292,6 @@ public sealed class ProcessWatcherService : IDisposable
         {
             _writeGate.Release();
         }
-
-        _memorySampler.StartSampling(entry.ProcessId);
 
         _logger.LogInformation("+ [{Source}] {Name} (PID {ProcessId}, parent {ParentName})",
             entry.SourceSeen, entry.Name, entry.ProcessId, parentName ?? "?");

@@ -81,7 +81,8 @@ public sealed class FocusWatcherService : IDisposable
         string? processName = null;
         try
         {
-            processName = Process.GetProcessById((int)pid).ProcessName;
+            using var process = Process.GetProcessById((int)pid);
+            processName = process.ProcessName;
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
         {

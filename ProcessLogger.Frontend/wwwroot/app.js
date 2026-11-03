@@ -198,8 +198,13 @@
       var cf = columnFilter(payload.entity, payload.column);
       var fmt = ENTITIES[payload.entity].columns[payload.column].fmt;
       var labels = Array.from(new Set(payload.values.map(fmt)));
+      // Numeric labels are rounded integers with locale digit grouping ("12,345"), which
+      // parseFloat would read as 12 - strip the separators before comparing them as numbers.
+      function asNumber(label) {
+        return /^-?[\d.,\s']+$/.test(label) ? parseFloat(label.replace(/[^\d-]/g, '')) : NaN;
+      }
       labels.sort(function (a, b) {
-        var na = parseFloat(a), nb = parseFloat(b);
+        var na = asNumber(a), nb = asNumber(b);
         if (!isNaN(na) && !isNaN(nb)) return na - nb;
         return a.localeCompare(b);
       });
@@ -228,6 +233,10 @@
     var sortDesc = state[entity].sortDesc;
     return rows.slice().sort(function (a, b) {
       var av = a[sortKey], bv = b[sortKey];
+      // Strings compare case-insensitively (byte-wise order puts every uppercase name before
+      // every lowercase one - see ProcessEventQueryService's Name sort).
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
       var cmp = av === bv ? 0 : (av === null || av === undefined) ? -1 : (bv === null || bv === undefined) ? 1 : (av < bv ? -1 : 1);
       return sortDesc ? -cmp : cmp;
     });
@@ -476,7 +485,11 @@
       filterBtn.title = 'Filter ' + label.textContent;
       filterBtn.addEventListener('click', function (e) {
         e.stopPropagation();
-        if (openPopover && openPopover.col === col && openPopover.entity === entity) { closePopover(); return; }
+        if (openPopover && openPopover.col === col && openPopover.entity === entity) {
+          closePopover();
+          renderTable(entity); // commit whatever selection changed while it was open
+          return;
+        }
         openColumnPopover(entity, col, filterBtn);
       });
 
