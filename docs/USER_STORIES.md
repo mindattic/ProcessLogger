@@ -56,3 +56,7 @@ _Nothing recorded yet._
 | PL-T33 | 2026-10-31 | chore | closed | Vault tab named after the repo: SettingsApp DisplayName 'Process Logger' -> 'ProcessLogger' | M.VALT-T75 decd9a4 |
 | PL-T34 | 2026-10-31 | chore | closed | Vault tab named after the repo: 'Process Logger' -> 'ProcessLogger' | M.VALT-T78 decd9a4 (manifest regenerated, no new commit) |
 | PL-T35 | 2026-10-31 | docs | closed | Update USER_STORIES.md | — |
+| PL-T36 | 2026-11-02 | docs | open | Adopt MindAttic.Agency docs-site pipeline, publish README to GitHub Pages (HOUSE-LAW-14) | — |
+| PL-T37 | 2026-11-02 | fix | closed | Bughunt sweep, two passes: find and fix real bugs across tracked source (user request 2026-11-02) | — |
+| PL-T38 | 2026-11-02 | fix | closed | Fix the open items the 2026-11-02 bughunt left for decision (normalize process Name with .exe, upgrade late WMI start to Both) | — |
+| PL-T39 | 2026-11-10 | chore | closed | Crash recovery: commit the command-catalog sync (.agent/commands/*.md) and regenerated docs/USER_STORIES.md left uncommitted by the session crash | — |
